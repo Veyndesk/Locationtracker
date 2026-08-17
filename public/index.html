@@ -83,6 +83,13 @@
   .fix ol { margin: 0; padding-left: 20px; }
   .fix li { margin-bottom: 4px; }
   .hidden { display: none; }
+  .mapframe {
+    width: 100%; height: 340px; border: 0; display: block;
+    border-radius: 8px; background: var(--bg);
+  }
+  .mapwrap { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  button.tab { padding: 6px 12px; font-size: 13px; font-weight: 500; }
+  button.tab[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
   .pill {
     display: inline-block; font-family: var(--mono); font-size: 11.5px;
     padding: 2px 7px; border-radius: 20px; border: 1px solid var(--border);
@@ -123,6 +130,17 @@
 
     <div id="error" class="msg bad"></div>
     <div id="howto" class="fix hidden"></div>
+  </div>
+
+  <div class="card hidden" id="mapcard">
+    <h2>Map</h2>
+    <div class="row" style="margin-bottom:12px">
+      <button class="tab" id="mapPrecise" aria-pressed="true" disabled>Precise fix</button>
+      <button class="tab" id="mapIp" aria-pressed="false" disabled>IP location</button>
+    </div>
+    <div class="mapwrap"><iframe id="mapframe" class="mapframe" loading="lazy"
+      referrerpolicy="no-referrer-when-downgrade" title="Map of the current location"></iframe></div>
+    <p class="msg" id="mapcaption"></p>
   </div>
 
   <div class="card hidden" id="logcard">
@@ -312,6 +330,15 @@
       source: sourceGuess(c.accuracy), readings: count
     };
     compareWithIp();
+
+    $('mapPrecise').disabled = false;
+    if (!mapSwitchedToPrecise) {
+      mapSwitchedToPrecise = true;
+      setMapMode('precise');
+    } else if (reason !== 'refining…') {
+      // Only redraw once the fix has settled — every reload flickers.
+      updateMap();
+    }
   }
 
   function logLine(pos, improved, n, t0) {
@@ -323,6 +350,56 @@
     $('log').appendChild(d);
     $('log').scrollTop = $('log').scrollHeight;
   }
+
+  /* ------------------------------ map ------------------------------- *
+   * Google Maps embed via the keyless output=embed endpoint. The official
+   * Embed API (google.com/maps/embed/v1/place?key=...) is the supported
+   * route but needs a billing-enabled key; this one needs nothing.
+   * Note: loading it sends the coordinates to Google.
+   * ------------------------------------------------------------------ */
+
+  let mapMode = 'precise';
+  let mapSwitchedToPrecise = false;
+
+  const zoomFor = (acc) =>
+    acc <= 20 ? 18 : acc <= 100 ? 17 : acc <= 500 ? 15 : acc <= 2000 ? 13 : 11;
+
+  function updateMap() {
+    let lat, lng, acc, caption;
+
+    if (mapMode === 'precise' && bestFix) {
+      lat = bestFix.latitude; lng = bestFix.longitude; acc = bestFix.accuracyMeters;
+      caption = 'Precise fix · ± ' + Math.round(acc) + ' m · ' + bestFix.source;
+    } else if (mapMode === 'ip' && ipData?.available) {
+      lat = ipData.latitude; lng = ipData.longitude; acc = 20000;
+      caption = 'IP location · ' + [ipData.city, ipData.country].filter(Boolean).join(', ') +
+        ' · city-level only, the pin is the centre of the IP range';
+    } else {
+      return;
+    }
+
+    const url = 'https://www.google.com/maps?q=' + lat + ',' + lng +
+      '&z=' + zoomFor(acc) + '&hl=en&output=embed';
+
+    const frame = $('mapframe');
+    $('mapcard').classList.remove('hidden');
+    // Reassigning src reloads the iframe, so skip it when nothing changed.
+    if (frame.dataset.src !== url) {
+      frame.dataset.src = url;
+      frame.src = url;
+    }
+    $('mapcaption').textContent = caption;
+  }
+
+  function setMapMode(mode) {
+    mapMode = mode;
+    $('mapPrecise').setAttribute('aria-pressed', String(mode === 'precise'));
+    $('mapIp').setAttribute('aria-pressed', String(mode === 'ip'));
+    updateMap();
+  }
+
+  $('mapPrecise').addEventListener('click', () => setMapMode('precise'));
+  $('mapIp').addEventListener('click', () => setMapMode('ip'));
 
   function run() {
     $('error').textContent = '';
@@ -433,6 +510,11 @@
         '<dt>Difference</dt><dd id="ipdelta">—</dd>' +
         '</dl>';
       compareWithIp();
+
+      // Show something on the map straight away; render() takes over as soon
+      // as a precise fix lands.
+      $('mapIp').disabled = false;
+      if (!bestFix) setMapMode('ip');
     })
     .catch((e) => { $('ip').innerHTML = '<p class="msg bad">Failed to load: ' + e.message + '</p>'; });
 

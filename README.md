@@ -27,6 +27,30 @@ Other settings that matter:
 - Errors with `code === 1` (permission denied) are terminal; codes 2 and 3 are
   not, since a device can fail a fix and then succeed seconds later.
 
+## Map
+
+The map is a Google Maps iframe on the keyless `output=embed` endpoint:
+
+```
+https://www.google.com/maps?q=LAT,LNG&z=18&hl=en&output=embed
+```
+
+No API key, no billing account. Zoom is derived from `coords.accuracy`, so a
+± 10 m GPS fix lands on z=18 while a city-level IP guess sits at z=11. Toggle
+buttons switch the pin between the precise fix and the IP location.
+
+The trade-off is that this endpoint is undocumented — Google has never
+promised to keep it. The supported route is the
+[Maps Embed API](https://developers.google.com/maps/documentation/embed):
+
+```html
+<iframe src="https://www.google.com/maps/embed/v1/place?key=YOUR_KEY&q=LAT,LNG&zoom=18"></iframe>
+```
+
+Either way, loading the map sends the coordinates to Google. If you want an
+accuracy circle drawn around the pin, or no third-party call at all, swap the
+iframe for Leaflet with OpenStreetMap tiles.
+
 ## Requirements
 
 Geolocation only works in a **secure context** — HTTPS, or `localhost`.
