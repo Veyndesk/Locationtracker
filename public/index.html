@@ -90,6 +90,17 @@
   .mapwrap { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   button.tab { padding: 6px 12px; font-size: 13px; font-weight: 500; }
   button.tab[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+  .tabs .tab { padding: 9px 16px; font-size: 14px; }
+  .tabs .tab[aria-selected="true"] {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+  }
+  input[type=text] {
+    font: inherit; font-family: var(--mono); font-size: 14px; flex: 1 1 220px;
+    min-width: 0; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--text);
+  }
   .pill {
     display: inline-block; font-family: var(--mono); font-size: 11.5px;
     padding: 2px 7px; border-radius: 20px; border: 1px solid var(--border);
@@ -101,6 +112,13 @@
 
   <h1>Location Tracker</h1>
   <p class="sub">Browser GPS (high accuracy, needs permission) with IP geolocation as a fallback.</p>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" id="tabMe" role="tab" aria-selected="true">My location</button>
+    <button class="tab" id="tabLookup" role="tab" aria-selected="false">IP lookup</button>
+  </nav>
+
+<section id="panel-me" role="tabpanel">
 
   <div class="card">
     <h2>Precise location — browser</h2>
@@ -157,6 +175,53 @@
     <h2>Diagnostics</h2>
     <dl id="diag"></dl>
   </div>
+
+</section>
+
+<section id="panel-lookup" role="tabpanel" class="hidden">
+
+  <div class="card">
+    <h2>Look up any IP address</h2>
+    <form id="lookupForm" class="row" autocomplete="off">
+      <input type="text" id="lookupIp" inputmode="text" spellcheck="false"
+             placeholder="8.8.8.8 or 2001:4860:4860::8888" aria-label="IP address">
+      <button type="submit" class="primary" id="lookupBtn">Look up</button>
+      <button type="button" id="lookupSelf">Use my IP</button>
+    </form>
+    <p class="msg" id="lookupStatus"></p>
+
+    <div id="lookupResult" class="hidden" style="margin-top:14px">
+      <p class="big" id="lkCoords"></p>
+      <p class="acc warn" id="lkPlace"></p>
+      <dl style="margin-top:14px">
+        <dt>ISP</dt><dd id="lkIsp"></dd>
+        <dt>ASN</dt><dd id="lkAsn"></dd>
+        <dt>Postal code</dt><dd id="lkPostal"></dd>
+        <dt>Timezone</dt><dd id="lkTz"></dd>
+        <dt>Source</dt><dd id="lkProvider"></dd>
+      </dl>
+      <div class="mapwrap" style="margin-top:14px">
+        <iframe id="lkMap" class="mapframe" loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade" title="Map of the looked-up IP address"></iframe>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button id="lkCopy">Copy JSON</button>
+        <a id="lkMaps" href="#" target="_blank" rel="noopener noreferrer"><button>Open in Google Maps</button></a>
+      </div>
+    </div>
+
+    <div class="fix" style="margin-top:16px">
+      <b>What this can and cannot tell you</b>
+      <ol>
+        <li>The result is the location an ISP <b>registered for a whole IP range</b>, not a device. Typical error is 5–50&nbsp;km.</li>
+        <li>Mobile carrier addresses resolve to the carrier's gateway, which can be hundreds of kilometres from the handset.</li>
+        <li>A VPN, proxy, or Cloudflare-style CDN returns the exit node — not the person behind it.</li>
+        <li>No IP lookup returns a street address. Only the browser GPS on the other tab gets near that, and only with the user's consent.</li>
+      </ol>
+    </div>
+  </div>
+
+</section>
 
 </div>
 
@@ -517,6 +582,84 @@
       if (!bestFix) setMapMode('ip');
     })
     .catch((e) => { $('ip').innerHTML = '<p class="msg bad">Failed to load: ' + e.message + '</p>'; });
+
+  /* ---------------------------- tabs -------------------------------- */
+
+  function selectTab(which) {
+    const me = which === 'me';
+    $('tabMe').setAttribute('aria-selected', String(me));
+    $('tabLookup').setAttribute('aria-selected', String(!me));
+    $('panel-me').classList.toggle('hidden', !me);
+    $('panel-lookup').classList.toggle('hidden', me);
+  }
+
+  $('tabMe').addEventListener('click', () => selectTab('me'));
+  $('tabLookup').addEventListener('click', () => selectTab('lookup'));
+
+  /* -------------------------- IP lookup ----------------------------- */
+
+  let lookupData = null;
+
+  async function lookup(ip) {
+    $('lookupStatus').className = 'msg';
+    $('lookupStatus').textContent = 'Looking up ' + (ip || 'your address') + '…';
+    $('lookupBtn').disabled = true;
+
+    try {
+      const r = await fetch('/api/ip' + (ip ? '?ip=' + encodeURIComponent(ip) : ''));
+      const d = await r.json();
+
+      if (!r.ok) {
+        $('lookupResult').classList.add('hidden');
+        $('lookupStatus').className = 'msg bad';
+        $('lookupStatus').textContent = d.error || 'Lookup failed.';
+        return;
+      }
+
+      lookupData = d;
+      $('lookupResult').classList.remove('hidden');
+      $('lookupStatus').className = 'msg';
+      $('lookupStatus').textContent = d.isSelf ? 'This is the address you are browsing from.' : '';
+      $('lookupIp').value = d.ip;
+
+      $('lkCoords').textContent = fmt(d.latitude, 4) + ', ' + fmt(d.longitude, 4);
+      $('lkPlace').textContent =
+        [d.flag, d.city, d.region, d.country].filter(Boolean).join(' · ') + ' — city-level only';
+      $('lkIsp').textContent = d.isp || '—';
+      $('lkAsn').textContent = d.asn ? 'AS' + d.asn : '—';
+      $('lkPostal').textContent = d.postalCode || '—';
+      $('lkTz').textContent = d.timezone || '—';
+      $('lkProvider').textContent = d.provider +
+        (d.failures?.length ? ' (after ' + d.failures.length + ' failed)' : '');
+      $('lkMaps').href = 'https://www.google.com/maps?q=' + d.latitude + ',' + d.longitude;
+      // z=11 deliberately: zooming to street level would imply a precision
+      // this data does not have.
+      $('lkMap').src = 'https://www.google.com/maps?q=' + d.latitude + ',' + d.longitude +
+        '&z=11&hl=en&output=embed';
+    } catch (e) {
+      $('lookupStatus').className = 'msg bad';
+      $('lookupStatus').textContent = 'Request failed: ' + e.message;
+    } finally {
+      $('lookupBtn').disabled = false;
+    }
+  }
+
+  $('lookupForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    lookup($('lookupIp').value.trim());
+  });
+
+  $('lookupSelf').addEventListener('click', () => {
+    $('lookupIp').value = '';
+    lookup('');
+  });
+
+  $('lkCopy').addEventListener('click', async () => {
+    if (!lookupData) return;
+    await navigator.clipboard.writeText(JSON.stringify(lookupData, null, 2));
+    $('lkCopy').textContent = 'Copied';
+    setTimeout(() => ($('lkCopy').textContent = 'Copy JSON'), 1200);
+  });
 
   /* ---------------------------- startup ----------------------------- */
 

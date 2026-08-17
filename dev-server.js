@@ -11,7 +11,10 @@ const path = require('path');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
-const geoHandler = require('./api/geo');
+const ROUTES = {
+  '/api/geo': require('./api/geo'),
+  '/api/ip': require('./api/ip'),
+};
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -26,11 +29,15 @@ http
   .createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
 
-    if (url.pathname === '/api/geo') {
-      // Minimal shim for the Express-ish helpers the handler uses.
+    const handler = ROUTES[url.pathname];
+    if (handler) {
+      // Minimal shim for the Express-ish helpers the handlers use.
       res.status = (c) => { res.statusCode = c; return res; };
       res.send = (b) => res.end(b);
-      return geoHandler(req, res);
+      return Promise.resolve(handler(req, res)).catch((e) => {
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: String(e.message || e) }));
+      });
     }
 
     const rel = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);

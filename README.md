@@ -27,6 +27,35 @@ Other settings that matter:
 - Errors with `code === 1` (permission denied) are terminal; codes 2 and 3 are
   not, since a device can fail a fix and then succeed seconds later.
 
+## IP lookup tab
+
+`api/ip.js` resolves any address you type. This is a **different mechanism**
+from `api/geo.js` — Vercel's `x-vercel-ip-*` headers only describe the client
+making the request and cannot be aimed at a third party, so looking up someone
+else's address means querying a geolocation database.
+
+Two keyless HTTPS providers are tried in order, `ipwho.is` then `ipapi.co`, and
+whichever answers first is normalised into one shape. The address is validated
+as IPv4/IPv6 before it is ever interpolated into a provider URL, and private,
+loopback, link-local, CGNAT and multicast ranges are rejected up front with an
+explanation rather than passed on.
+
+### Accuracy ceiling
+
+An IP maps to the location an ISP **registered for a whole range**, not to a
+device. Typical error is 5–50 km. It gets worse:
+
+- **Mobile carriers** hand out addresses from a gateway pool; the pin can be
+  hundreds of kilometres from the handset.
+- **VPNs, proxies and CDNs** return the exit node. Looking up `1.1.1.1` returns
+  Brisbane, because that is where APNIC registered it — while the anycast
+  address itself is answered from hundreds of sites worldwide.
+- **No IP lookup returns a street address.** Anything claiming otherwise is
+  selling you a database with the same city-level data and a confident UI.
+
+The map on this tab is pinned to `z=11` on purpose. Zooming to street level
+would imply a precision the data does not have.
+
 ## Map
 
 The map is a Google Maps iframe on the keyless `output=embed` endpoint:
