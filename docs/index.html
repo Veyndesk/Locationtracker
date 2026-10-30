@@ -1,0 +1,1077 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="description" content="Find your precise location with browser GPS, or look up the approximate location of any IP address. By Veyndesk.">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b0d12" media="(prefers-color-scheme: dark)">
+<title>Location Tracker · Veyndesk</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f6bff'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23fff'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%23fff' stroke-opacity='.5' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --surface-2: #f0f2f5;
+    --border: #e3e6eb;
+    --text: #12151b;
+    --muted: #646b78;
+    --accent: #2f6bff;
+    --accent-soft: rgba(47, 107, 255, .1);
+    --good: #16a34a;
+    --warn: #c2780a;
+    --bad: #dc2626;
+    --ip: #e08a00;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 4px 16px rgba(16, 24, 40, .05);
+    --radius: 16px;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --tile-filter: none;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b0d12; --surface: #13161d; --surface-2: #1a1e27; --border: #262b36;
+      --text: #e8ebf1; --muted: #8f98a8; --accent: #6b9bff; --accent-soft: rgba(107, 155, 255, .14);
+      --good: #4ade80; --warn: #fbbf24; --bad: #f87171; --ip: #fbbf24;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+      --tile-filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.9) saturate(.6);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0d12; --surface: #13161d; --surface-2: #1a1e27; --border: #262b36;
+    --text: #e8ebf1; --muted: #8f98a8; --accent: #6b9bff; --accent-soft: rgba(107, 155, 255, .14);
+    --good: #4ade80; --warn: #fbbf24; --bad: #f87171; --ip: #fbbf24;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+    --tile-filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.9) saturate(.6);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+  .hidden { display: none !important; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: var(--mono); font-size: .9em; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
+
+  /* ---------- header ---------- */
+  header.top {
+    position: sticky; top: 0; z-index: 1000;
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  header.top .wrap { display: flex; align-items: center; gap: 12px; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -.01em; }
+  .brand .logo { width: 30px; height: 30px; flex: none; }
+  .brand small { display: block; font-weight: 500; font-size: 12px; color: var(--muted); line-height: 1.1; }
+  .brand span { line-height: 1.15; }
+  .spacer { flex: 1; }
+  .seg button { white-space: nowrap; }
+  @media (max-width: 520px) {
+    header.top .wrap { gap: 8px; }
+    .brand > span { display: none; }
+    header.top .seg button { padding: 7px 11px; font-size: 13px; }
+  }
+
+  /* ---------- buttons ---------- */
+  button, .btn {
+    font: inherit; font-weight: 560; font-size: 14px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 16px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    cursor: pointer; touch-action: manipulation; text-decoration: none;
+    transition: border-color .15s, background .15s, transform .05s;
+  }
+  button:hover:not(:disabled), .btn:hover { border-color: var(--accent); text-decoration: none; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button:focus-visible, .btn:focus-visible, input:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  .primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .primary:hover:not(:disabled) { filter: brightness(1.07); }
+  .icon-btn { padding: 8px; width: 38px; height: 38px; }
+  .btn svg, button svg { width: 16px; height: 16px; flex: none; }
+
+  /* ---------- segmented tabs ---------- */
+  .seg {
+    display: inline-flex; padding: 4px; gap: 4px; border-radius: 12px;
+    background: var(--surface-2); border: 1px solid var(--border);
+  }
+  .seg button {
+    border: 0; background: transparent; padding: 7px 14px; font-size: 13.5px; border-radius: 9px; color: var(--muted);
+  }
+  .seg button[aria-selected="true"], .seg button[aria-pressed="true"] {
+    background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12);
+  }
+
+  /* ---------- layout ---------- */
+  main { padding: 32px 0 48px; }
+  .hero { margin: 8px 0 22px; }
+  .hero h1 { font-size: clamp(24px, 4vw, 32px); margin: 0 0 6px; letter-spacing: -.025em; line-height: 1.15; }
+  .hero p { color: var(--muted); margin: 0; max-width: 620px; }
+  .grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 900px) {
+    .grid.two { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); align-items: start; }
+  }
+  .stack { display: grid; gap: 16px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); min-width: 0;
+  }
+  .card-h { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
+  .card-h h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--muted); margin: 0; font-weight: 650;
+  }
+  .card-h .spacer { flex: 1; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  /* ---------- locate card ---------- */
+  .locate { text-align: center; padding: 22px 18px; }
+  .radar {
+    position: relative; width: 132px; height: 132px; margin: 4px auto 16px;
+    display: grid; place-items: center;
+  }
+  .radar svg.ring { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .radar .ring-bg { stroke: var(--surface-2); }
+  .radar .ring-fg { stroke: var(--accent); transition: stroke-dashoffset .2s linear, stroke .3s; }
+  .radar .dot {
+    width: 54px; height: 54px; border-radius: 50%; background: var(--accent-soft);
+    display: grid; place-items: center; color: var(--accent); position: relative;
+  }
+  .radar .dot svg { width: 26px; height: 26px; }
+  .radar.busy .dot::after {
+    content: ""; position: absolute; inset: -10px; border-radius: 50%;
+    border: 2px solid var(--accent); opacity: 0; animation: ping 1.6s ease-out infinite;
+  }
+  @keyframes ping { 0% { transform: scale(.6); opacity: .7; } 100% { transform: scale(1.6); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .radar.busy .dot::after { animation: none; } }
+  .status { font-weight: 600; margin: 0 0 4px; }
+  .status-sub { color: var(--muted); font-size: 13.5px; margin: 0 0 16px; min-height: 1.5em; }
+  .locate .row { justify-content: center; }
+  .locate .primary { padding: 12px 22px; font-size: 15px; }
+
+  .coords {
+    font-family: var(--mono); font-size: clamp(20px, 3.2vw, 26px); font-weight: 650;
+    letter-spacing: -.02em; margin: 0; word-break: break-all;
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600;
+    padding: 3px 10px; border-radius: 999px; border: 1px solid currentColor;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+  }
+  .chip i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .good { color: var(--good); } .warn { color: var(--warn); } .bad { color: var(--bad); } .muted { color: var(--muted); }
+
+  .meter { margin-top: 14px; }
+  .meter-track {
+    position: relative; height: 8px; border-radius: 99px;
+    background: linear-gradient(90deg, var(--good), var(--warn) 55%, var(--bad));
+    opacity: .9;
+  }
+  .meter-pin {
+    position: absolute; top: 50%; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--surface); border: 3px solid var(--text); transform: translate(-50%, -50%);
+    transition: left .4s ease;
+  }
+  .meter-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 6px; font-family: var(--mono); }
+
+  .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+  .stat { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+  .stat .k { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+  .stat .v { font-family: var(--mono); font-size: 14px; margin-top: 2px; overflow-wrap: anywhere; }
+
+  /* ---------- map ---------- */
+  .map { height: 420px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: var(--surface-2); z-index: 0; }
+  .map.small { height: 320px; }
+  @media (max-width: 600px) { .map { height: 320px; } }
+  .leaflet-tile-pane { filter: var(--tile-filter); }
+  .leaflet-container { font: inherit; background: var(--surface-2); }
+  .leaflet-control-attribution { font-size: 10.5px; }
+  .leaflet-bar a { background: var(--surface); color: var(--text); border-color: var(--border) !important; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--text); }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 50%; }
+  .empty-map {
+    height: 100%; display: grid; place-items: center; text-align: center; color: var(--muted); padding: 24px; font-size: 14px;
+  }
+
+  /* ---------- lists ---------- */
+  dl.kv { display: grid; grid-template-columns: minmax(104px, auto) 1fr; gap: 8px 14px; margin: 0; }
+  dl.kv dt { color: var(--muted); font-size: 13px; }
+  dl.kv dd { margin: 0; font-family: var(--mono); font-size: 13px; overflow-wrap: anywhere; }
+
+  .spark { width: 100%; height: 70px; display: block; }
+  .spark path.line { fill: none; stroke: var(--accent); stroke-width: 2; }
+  .spark path.area { fill: var(--accent-soft); stroke: none; }
+  .spark line.target { stroke: var(--good); stroke-dasharray: 4 4; stroke-width: 1; }
+  .log { max-height: 180px; overflow-y: auto; font-family: var(--mono); font-size: 12.5px; margin-top: 10px; }
+  .log div { padding: 5px 0; border-bottom: 1px dashed var(--border); display: flex; gap: 10px; }
+  .log div:last-child { border-bottom: 0; }
+  .log .t { color: var(--muted); min-width: 56px; }
+  .log .best { color: var(--good); font-weight: 600; }
+
+  details.card > summary {
+    cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px;
+    font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 650;
+  }
+  details.card > summary::-webkit-details-marker { display: none; }
+  details.card > summary::after { content: "+"; margin-left: auto; font-size: 18px; line-height: 1; }
+  details.card[open] > summary::after { content: "–"; }
+  details.card[open] > summary { margin-bottom: 14px; }
+
+  .opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .opts label { font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
+  input[type=number], input[type=text] {
+    font: inherit; font-family: var(--mono); font-size: 14px; width: 100%;
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--surface-2); color: var(--text); min-width: 0;
+  }
+
+  .note {
+    padding: 12px 14px; border-radius: 12px; font-size: 13.5px;
+    background: var(--surface-2); border: 1px solid var(--border);
+  }
+  .note > b { display: block; margin-bottom: 6px; }
+  .note ol, .note ul { margin: 0; padding-left: 20px; }
+  .note li { margin-bottom: 4px; }
+  .note.error { border-color: color-mix(in srgb, var(--bad) 40%, var(--border)); }
+  .msg { font-size: 13.5px; color: var(--muted); margin: 10px 0 0; }
+
+  .pill {
+    display: inline-block; font-family: var(--mono); font-size: 11.5px;
+    padding: 2px 8px; border-radius: 20px; border: 1px solid currentColor;
+  }
+
+  .search { display: flex; gap: 8px; flex-wrap: wrap; }
+  .search input { flex: 1 1 240px; padding: 12px 14px; font-size: 15px; }
+  .examples { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .examples button { padding: 4px 10px; font-size: 12.5px; font-family: var(--mono); font-weight: 500; border-radius: 99px; }
+
+  .place { font-size: 18px; font-weight: 650; margin: 2px 0 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .flag { font-size: 22px; }
+
+  footer { color: var(--muted); font-size: 13px; padding: 28px 0 40px; border-top: 1px solid var(--border); }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0;
+    background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px;
+    transition: opacity .2s, transform .2s; pointer-events: none; z-index: 2000;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#2f6bff"/>
+        <circle cx="16" cy="16" r="10" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="2"/>
+        <circle cx="16" cy="16" r="4.5" fill="#fff"/>
+      </svg>
+      <span>Location Tracker<small>by Veyndesk</small></span>
+    </div>
+    <div class="spacer"></div>
+    <nav class="seg" role="tablist" aria-label="Mode">
+      <button id="tabMe" role="tab" aria-selected="true" aria-controls="panel-me">My location</button>
+      <button id="tabLookup" role="tab" aria-selected="false" aria-controls="panel-lookup">IP lookup</button>
+    </nav>
+    <button class="icon-btn" id="themeBtn" aria-label="Toggle dark mode" title="Toggle theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ===================== MY LOCATION ===================== -->
+<section id="panel-me" role="tabpanel" aria-labelledby="tabMe">
+
+  <div class="hero">
+    <h1>Where am I, exactly?</h1>
+    <p>Uses your device's GPS for a precise fix (needs your permission), with an IP-based estimate as a fallback. Nothing is stored or sent anywhere except the map tiles.</p>
+  </div>
+
+  <div class="grid two">
+    <div class="stack">
+
+      <div class="card locate">
+        <div class="radar" id="radar">
+          <svg class="ring" viewBox="0 0 132 132" aria-hidden="true">
+            <circle class="ring-bg" cx="66" cy="66" r="60" fill="none" stroke-width="6"/>
+            <circle class="ring-fg" id="ring" cx="66" cy="66" r="60" fill="none" stroke-width="6"
+                    stroke-linecap="round" stroke-dasharray="376.99" stroke-dashoffset="376.99"/>
+          </svg>
+          <div class="dot">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg>
+          </div>
+        </div>
+        <p class="status" id="status">Ready when you are</p>
+        <p class="status-sub" id="statusSub">Tap below and allow location access.</p>
+        <div class="row">
+          <button id="start" class="primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+            Get my location
+          </button>
+          <button id="stop" disabled>Stop</button>
+        </div>
+        <div id="errorBox" class="note error hidden" style="margin-top:16px;text-align:left" role="alert"></div>
+      </div>
+
+      <div class="card hidden" id="resultCard">
+        <div class="card-h"><h2>Precise fix</h2><div class="spacer"></div><span id="accChip" class="chip"></span></div>
+        <p class="coords" id="coords"></p>
+        <p class="msg" id="sourceLine" style="margin-top:4px"></p>
+        <div class="meter" aria-hidden="true">
+          <div class="meter-track"><div class="meter-pin" id="meterPin" style="left:0%"></div></div>
+          <div class="meter-scale"><span>1 m</span><span>30 m</span><span>500 m</span><span>5 km+</span></div>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="k">Altitude</div><div class="v" id="altitude">—</div></div>
+          <div class="stat"><div class="k">Heading · speed</div><div class="v" id="motion">—</div></div>
+          <div class="stat"><div class="k">Fix time</div><div class="v" id="fixtime">—</div></div>
+          <div class="stat"><div class="k">Readings</div><div class="v" id="count">—</div></div>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <button id="copy">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy JSON
+          </button>
+          <button id="copyCoords">Copy coordinates</button>
+          <a id="maps" class="btn" href="#" target="_blank" rel="noopener noreferrer">Open in Google Maps ↗</a>
+        </div>
+      </div>
+
+      <details class="card">
+        <summary>Settings</summary>
+        <div class="opts">
+          <label>Stop at accuracy (m)<input type="number" id="target" value="15" min="1" max="1000"></label>
+          <label>Time limit (s)<input type="number" id="maxdur" value="20" min="3" max="120"></label>
+        </div>
+        <p class="msg">The first reading is usually coarse (Wi-Fi or cell). The tool keeps listening and keeps the most accurate fix until it hits your target or the time limit.</p>
+      </details>
+
+    </div>
+
+    <div class="stack">
+
+      <div class="card">
+        <div class="card-h">
+          <h2>Map</h2><div class="spacer"></div>
+          <div class="seg" role="group" aria-label="Map focus">
+            <button id="focusPrecise" aria-pressed="true" disabled>Precise</button>
+            <button id="focusIp" aria-pressed="false" disabled>IP</button>
+          </div>
+        </div>
+        <div class="map" id="map"><div class="empty-map" id="mapEmpty">Loading map…</div></div>
+        <div class="legend">
+          <span><i style="background:var(--accent)"></i>Precise fix &amp; accuracy circle</span>
+          <span><i style="background:var(--ip)"></i>IP estimate (city level)</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h2>Approximate location · IP address</h2><div class="spacer"></div><span id="ipBadge" class="pill muted">loading</span></div>
+        <div id="ip"><p class="msg" style="margin:0">Looking up your IP address…</p></div>
+      </div>
+
+      <div class="card hidden" id="logcard">
+        <div class="card-h"><h2>Convergence</h2><div class="spacer"></div><span class="muted" style="font-size:12.5px">accuracy over time</span></div>
+        <svg class="spark" id="spark" viewBox="0 0 300 70" preserveAspectRatio="none" aria-label="Accuracy over time"></svg>
+        <div class="log" id="log"></div>
+      </div>
+
+      <details class="card">
+        <summary>Diagnostics</summary>
+        <dl class="kv" id="diag"></dl>
+      </details>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===================== IP LOOKUP ===================== -->
+<section id="panel-lookup" role="tabpanel" aria-labelledby="tabLookup" class="hidden">
+
+  <div class="hero">
+    <h1>Look up any IP address</h1>
+    <p>See the city, network and ISP that an IP address is registered to. This is a database estimate, not a device's position.</p>
+  </div>
+
+  <div class="grid two">
+    <div class="stack">
+      <div class="card">
+        <form id="lookupForm" class="search" autocomplete="off">
+          <label class="sr" for="lookupIp">IP address</label>
+          <input type="text" id="lookupIp" inputmode="text" spellcheck="false"
+                 placeholder="8.8.8.8 or 2001:4860::8888">
+          <button type="submit" class="primary" id="lookupBtn">Look up</button>
+        </form>
+        <div class="examples">
+          <button type="button" id="lookupSelf">My IP</button>
+          <button type="button" data-ip="8.8.8.8">8.8.8.8</button>
+          <button type="button" data-ip="1.1.1.1">1.1.1.1</button>
+          <button type="button" data-ip="2001:4860:4860::8888">2001:4860:4860::8888</button>
+        </div>
+        <p class="msg" id="lookupStatus" role="status"></p>
+      </div>
+
+      <div class="card hidden" id="lookupResult">
+        <div class="card-h"><h2>Result</h2><div class="spacer"></div><span class="chip warn"><i></i>city level</span></div>
+        <p class="place" id="lkPlace"></p>
+        <p class="coords" id="lkCoords" style="font-size:18px;margin-top:6px"></p>
+        <dl class="kv" style="margin-top:14px">
+          <dt>IP</dt><dd id="lkIp"></dd>
+          <dt>ISP</dt><dd id="lkIsp"></dd>
+          <dt>ASN</dt><dd id="lkAsn"></dd>
+          <dt>Postal code</dt><dd id="lkPostal"></dd>
+          <dt>Timezone</dt><dd id="lkTz"></dd>
+          <dt>Source</dt><dd id="lkProvider"></dd>
+        </dl>
+        <div class="row" style="margin-top:16px">
+          <button id="lkCopy">Copy JSON</button>
+          <a id="lkMaps" class="btn" href="#" target="_blank" rel="noopener noreferrer">Open in Google Maps ↗</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="card">
+        <div class="card-h"><h2>Map</h2></div>
+        <div class="map" id="lkMap"><div class="empty-map">Search for an address to see it here.</div></div>
+        <p class="msg">The shaded circle is a rough 25 km uncertainty. The map won't zoom past city level, because the data isn't more precise than that.</p>
+      </div>
+
+      <div class="note">
+        <b>What this can and cannot tell you</b>
+        <ol>
+          <li>The result is the location an ISP <b>registered for a whole IP range</b>, not a device. Typical error is 5–50&nbsp;km.</li>
+          <li>Mobile carrier addresses resolve to the carrier's gateway, which can be hundreds of kilometres from the phone.</li>
+          <li>A VPN, proxy or CDN returns the exit node, not the person behind it.</li>
+          <li>No IP lookup returns a street address. Only the GPS on the other tab gets close, and only with the user's consent.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© <span id="year"></span> Veyndesk</span>
+    <a href="https://github.com/veyndesk/Locationtracker" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
+    <span>Map data © OpenStreetMap contributors</span>
+    <span>IP data: ipwho.is · ipapi.co · GeoJS</span>
+  </div>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script>
+(() => {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n, d = 6) => (n === null || n === undefined || Number.isNaN(n) ? '—' : Number(n).toFixed(d));
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  $('year').textContent = new Date().getFullYear();
+
+  /* ------------------------------ theme ------------------------------ */
+  const root = document.documentElement;
+  const storedTheme = (() => { try { return localStorage.getItem('theme'); } catch { return null; } })();
+  if (storedTheme) root.dataset.theme = storedTheme;
+  $('themeBtn').addEventListener('click', () => {
+    const dark = root.dataset.theme
+      ? root.dataset.theme === 'dark'
+      : matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme = dark ? 'light' : 'dark';
+    try { localStorage.setItem('theme', root.dataset.theme); } catch {}
+  });
+
+  /* ------------------------------ toast ------------------------------ */
+  let toastTimer;
+  function toast(text) {
+    const t = $('toast');
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 1600);
+  }
+  async function copy(text, label) {
+    try { await navigator.clipboard.writeText(text); toast(label + ' copied'); }
+    catch { toast('Copy failed — your browser blocked clipboard access'); }
+  }
+
+  /* --------------------------- environment --------------------------- */
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/.test(ua);
+  const hasApi = 'geolocation' in navigator;
+  const secure = window.isSecureContext;
+  const inFrame = window.self !== window.top;
+  let permState = 'unknown';
+
+  function readPermission() {
+    if (!navigator.permissions?.query) return Promise.resolve('unsupported');
+    return navigator.permissions.query({ name: 'geolocation' })
+      .then((s) => {
+        s.onchange = () => { permState = s.state; renderDiagnostics(); };
+        return s.state;
+      })
+      .catch(() => 'unsupported');
+  }
+
+  function renderDiagnostics() {
+    const pill = (ok, text) => '<span class="pill ' + (ok ? 'good' : 'bad') + '">' + esc(text) + '</span>';
+    $('diag').innerHTML =
+      '<dt>Secure context</dt><dd>' + pill(secure, secure ? 'yes (' + location.protocol + ')' : 'no — ' + location.protocol + ' blocks geolocation') + '</dd>' +
+      '<dt>Geolocation API</dt><dd>' + pill(hasApi, hasApi ? 'available' : 'missing') + '</dd>' +
+      '<dt>Permission</dt><dd>' + pill(permState !== 'denied', permState) + '</dd>' +
+      '<dt>In iframe</dt><dd>' + (inFrame ? pill(false, 'yes — needs allow="geolocation"') : 'no') + '</dd>' +
+      '<dt>Platform</dt><dd>' + (isIOS ? 'iOS' : isAndroid ? 'Android' : 'Desktop') + '</dd>' +
+      '<dt>Origin</dt><dd>' + esc(location.origin) + '</dd>';
+  }
+
+  /* ------------------------ platform help ---------------------------- */
+  function showHelp(message, kind) {
+    let title, steps;
+    if (kind === 'insecure') {
+      title = 'This page is not served over HTTPS';
+      steps = [
+        'Open the https:// address of this site instead of a plain http:// or LAN address.',
+        'Browsers only exempt <code>localhost</code> from the HTTPS rule.',
+      ];
+    } else if (isIOS) {
+      title = 'Turn on location for Safari (iOS)';
+      steps = [
+        'Settings → Privacy &amp; Security → Location Services → <b>On</b>.',
+        'In that list: Safari Websites → <b>While Using the App</b>, and turn on <b>Precise Location</b>.',
+        'In Safari, tap <b>ᴀA</b> in the address bar → Website Settings → Location → <b>Allow</b>.',
+      ];
+    } else if (isAndroid) {
+      title = 'Turn on location for Chrome (Android)';
+      steps = [
+        'Tap the icon at the left of the address bar → Permissions → Location → <b>Allow</b>.',
+        'Android Settings → Location → <b>On</b>, with Google Location Accuracy on.',
+        'Turn off Battery Saver — it throttles GPS.',
+      ];
+    } else {
+      title = 'Allow location for this site';
+      steps = [
+        'Click the icon at the left of the address bar → Location → <b>Allow</b>, then reload.',
+        'On Windows: Settings → Privacy &amp; security → Location → <b>On</b>.',
+        'On macOS: System Settings → Privacy &amp; Security → Location Services → enable your browser.',
+      ];
+    }
+    const box = $('errorBox');
+    box.classList.remove('hidden');
+    box.innerHTML = '<b class="bad">' + esc(message) + '</b><p style="margin:0 0 8px">' + title + ':</p><ol><li>' + steps.join('</li><li>') + '</li></ol>';
+  }
+
+  /* ------------------------------ maps ------------------------------- */
+  const hasLeaflet = typeof window.L !== 'undefined';
+  const css = (name) => getComputedStyle(root).getPropertyValue(name).trim();
+
+  function makeMap(el) {
+    if (!hasLeaflet) {
+      el.innerHTML = '<div class="empty-map">The map library failed to load.</div>';
+      return null;
+    }
+    el.innerHTML = '';
+    const m = L.map(el, { zoomControl: true, attributionControl: true, worldCopyJump: true }).setView([20, 0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, subdomains: 'abc',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(m);
+    return m;
+  }
+
+  const map = makeMap($('map'));
+  let preciseLayer = null, ipLayer = null, focus = 'precise';
+
+  function drawPrecise() {
+    if (!map || !bestFix) return;
+    const ll = [bestFix.latitude, bestFix.longitude];
+    const accent = css('--accent');
+    if (!preciseLayer) {
+      preciseLayer = {
+        circle: L.circle(ll, { radius: bestFix.accuracyMeters, color: accent, weight: 1.5, fillColor: accent, fillOpacity: .15 }).addTo(map),
+        dot: L.circleMarker(ll, { radius: 8, color: '#fff', weight: 3, fillColor: accent, fillOpacity: 1 }).addTo(map),
+      };
+    } else {
+      preciseLayer.circle.setLatLng(ll).setRadius(bestFix.accuracyMeters);
+      preciseLayer.dot.setLatLng(ll);
+    }
+    preciseLayer.dot.bindPopup('<b>Precise fix</b><br>± ' + Math.round(bestFix.accuracyMeters) + ' m · ' + esc(bestFix.source));
+  }
+
+  function drawIp() {
+    if (!map || !ipData) return;
+    const ll = [ipData.latitude, ipData.longitude];
+    const c = css('--ip');
+    if (ipLayer) { ipLayer.circle.remove(); ipLayer.dot.remove(); }
+    ipLayer = {
+      circle: L.circle(ll, { radius: 25000, color: c, weight: 1.5, dashArray: '6 6', fillColor: c, fillOpacity: .08 }).addTo(map),
+      dot: L.circleMarker(ll, { radius: 7, color: '#fff', weight: 3, fillColor: c, fillOpacity: 1 }).addTo(map),
+    };
+    ipLayer.dot.bindPopup('<b>IP estimate</b><br>' + esc([ipData.city, ipData.country].filter(Boolean).join(', ')) + '<br><span style="opacity:.7">city level only</span>');
+  }
+
+  function fitFocus() {
+    if (!map) return;
+    if (focus === 'precise' && preciseLayer) {
+      map.fitBounds(preciseLayer.circle.getBounds(), { maxZoom: 18, padding: [30, 30] });
+    } else if (focus === 'ip' && ipLayer) {
+      map.fitBounds(ipLayer.circle.getBounds(), { maxZoom: 11, padding: [20, 20] });
+    }
+  }
+
+  function setFocus(f) {
+    focus = f;
+    $('focusPrecise').setAttribute('aria-pressed', String(f === 'precise'));
+    $('focusIp').setAttribute('aria-pressed', String(f === 'ip'));
+    fitFocus();
+  }
+  $('focusPrecise').addEventListener('click', () => setFocus('precise'));
+  $('focusIp').addEventListener('click', () => setFocus('ip'));
+
+  /* ---------------- core: watchPosition, keep best fix --------------- */
+  function trackBestFix({ targetAccuracy, maxDurationMs, onReading, onDone, onError }) {
+    let best = null, count = 0, watchId = null, timer = null, finished = false, lastError = null;
+
+    const finish = (reason) => {
+      if (finished) return;
+      finished = true;
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      clearTimeout(timer);
+      if (best) onDone(best, count, reason);
+      else onError(lastError || { code: 3, message: 'No position fix within the time limit.' });
+    };
+
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        count++;
+        const improved = !best || pos.coords.accuracy < best.coords.accuracy;
+        if (improved) best = pos;
+        onReading(pos, improved, count);
+        if (best.coords.accuracy <= targetAccuracy) finish('target reached');
+      },
+      (err) => {
+        lastError = err;
+        if (err.code === 1) {
+          if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+          clearTimeout(timer);
+          finished = true;
+          onError(err);
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: maxDurationMs }
+    );
+
+    timer = setTimeout(() => finish('time limit'), maxDurationMs);
+    return () => finish('stopped');
+  }
+
+  /* ------------------------------ UI -------------------------------- */
+  let cancel = null, bestFix = null, readings = [], t0 = 0, targetAcc = 15;
+
+  const sourceGuess = (a) => a <= 30 ? 'GPS / GNSS' : a <= 200 ? 'Wi-Fi positioning' : a <= 3000 ? 'Cell tower' : 'IP / very coarse';
+  const accClass = (a) => (a <= 30 ? 'good' : a <= 500 ? 'warn' : 'bad');
+  // log scale 1 m .. 5000 m -> 0..100 %
+  const meterPct = (a) => Math.max(0, Math.min(100, (Math.log10(Math.max(1, a)) / Math.log10(5000)) * 100));
+
+  function setRing(frac, cls) {
+    const C = 376.99;
+    $('ring').style.strokeDashoffset = String(C * (1 - Math.max(0, Math.min(1, frac))));
+    $('ring').style.stroke = cls ? css('--' + cls) : '';
+  }
+
+  function render(pos, count, reason) {
+    const c = pos.coords;
+    $('resultCard').classList.remove('hidden');
+    $('coords').textContent = fmt(c.latitude) + ', ' + fmt(c.longitude);
+    const cls = accClass(c.accuracy);
+    $('accChip').className = 'chip ' + cls;
+    $('accChip').innerHTML = '<i></i>± ' + Math.round(c.accuracy) + ' m';
+    $('sourceLine').textContent = sourceGuess(c.accuracy) + (reason ? ' · ' + reason : '');
+    $('meterPin').style.left = meterPct(c.accuracy) + '%';
+    $('altitude').textContent = c.altitude === null ? '—'
+      : fmt(c.altitude, 1) + ' m' + (c.altitudeAccuracy !== null ? ' ±' + Math.round(c.altitudeAccuracy) : '');
+    $('motion').textContent = (c.heading === null || Number.isNaN(c.heading) ? '—' : fmt(c.heading, 0) + '°') +
+      ' · ' + (c.speed === null ? '—' : fmt(c.speed, 1) + ' m/s');
+    $('fixtime').textContent = new Date(pos.timestamp).toLocaleTimeString();
+    $('count').textContent = count + ' fix' + (count === 1 ? '' : 'es');
+    $('maps').href = 'https://www.google.com/maps?q=' + c.latitude + ',' + c.longitude;
+
+    bestFix = {
+      latitude: c.latitude, longitude: c.longitude, accuracyMeters: c.accuracy,
+      altitude: c.altitude, altitudeAccuracy: c.altitudeAccuracy,
+      heading: c.heading, speed: c.speed,
+      timestamp: new Date(pos.timestamp).toISOString(),
+      source: sourceGuess(c.accuracy), readings: count,
+    };
+
+    $('focusPrecise').disabled = false;
+    drawPrecise();
+    if (focus === 'precise' || !ipLayer) setFocus('precise');
+    compareWithIp();
+  }
+
+  function logReading(pos, improved, n) {
+    $('logcard').classList.remove('hidden');
+    const sec = (Date.now() - t0) / 1000;
+    readings.push({ t: sec, a: pos.coords.accuracy });
+    const d = document.createElement('div');
+    d.innerHTML = '<span class="t">+' + sec.toFixed(1) + 's</span><span class="' + (improved ? 'best' : '') + '">#' + n +
+      ' · ± ' + Math.round(pos.coords.accuracy) + ' m' + (improved ? '  ← best' : '') + '</span>';
+    $('log').prepend(d);
+    drawSpark();
+  }
+
+  function drawSpark() {
+    const svg = $('spark');
+    if (readings.length < 1) { svg.innerHTML = ''; return; }
+    const W = 300, H = 70, pad = 6;
+    const ys = readings.map((r) => Math.log10(Math.max(1, r.a)));
+    const maxY = Math.max(...ys, Math.log10(targetAcc) + .2), minY = 0;
+    const maxT = Math.max(readings[readings.length - 1].t, 1);
+    const X = (t) => pad + (t / maxT) * (W - pad * 2);
+    const Y = (v) => pad + (1 - (v - minY) / (maxY - minY || 1)) * (H - pad * 2);
+    const pts = readings.map((r, i) => [X(r.t), Y(ys[i])]);
+    if (pts.length === 1) pts.push([W - pad, pts[0][1]]);
+    const line = 'M' + pts.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' L');
+    const area = line + ' L' + pts[pts.length - 1][0].toFixed(1) + ',' + H + ' L' + pts[0][0].toFixed(1) + ',' + H + ' Z';
+    const ty = Y(Math.log10(targetAcc)).toFixed(1);
+    svg.innerHTML = '<path class="area" d="' + area + '"/><path class="line" d="' + line + '"/>' +
+      '<line class="target" x1="0" x2="' + W + '" y1="' + ty + '" y2="' + ty + '"/>';
+  }
+
+  function setStatus(main, sub) { $('status').textContent = main; $('statusSub').textContent = sub || ''; }
+
+  function run() {
+    $('errorBox').classList.add('hidden');
+    $('log').innerHTML = '';
+    readings = [];
+
+    if (!hasApi) { setStatus('Not supported', ''); showHelp('This browser has no Geolocation API.', 'other'); return; }
+    if (!secure) { setStatus('Blocked', ''); showHelp('Geolocation needs HTTPS.', 'insecure'); return; }
+
+    targetAcc = Math.max(1, Number($('target').value) || 15);
+    const maxDurationMs = Math.max(3, Number($('maxdur').value) || 20) * 1000;
+    t0 = Date.now();
+
+    $('start').disabled = true;
+    $('stop').disabled = false;
+    $('radar').classList.add('busy');
+    setStatus('Locating…', 'Waiting for the first fix. Allow access if your browser asks.');
+
+    const tick = setInterval(() => {
+      const left = Math.max(0, (maxDurationMs - (Date.now() - t0)) / 1000);
+      if (!bestFix || readings.length === 0) setRing((Date.now() - t0) / maxDurationMs);
+      if (readings.length) {
+        $('statusSub').textContent = 'Refining… best ± ' + Math.round(bestFix.accuracyMeters) + ' m · ' + left.toFixed(0) + ' s left';
+      }
+    }, 150);
+
+    const done = () => {
+      clearInterval(tick);
+      $('start').disabled = false;
+      $('stop').disabled = true;
+      $('radar').classList.remove('busy');
+      cancel = null;
+      readPermission().then((s) => { permState = s; renderDiagnostics(); });
+    };
+
+    cancel = trackBestFix({
+      targetAccuracy: targetAcc,
+      maxDurationMs,
+      onReading: (pos, improved, n) => {
+        logReading(pos, improved, n);
+        if (improved) {
+          render(pos, n, 'refining…');
+          // ring shows how close we are to the target accuracy
+          const a = pos.coords.accuracy;
+          setRing(Math.min(1, Math.log10(5000 / a) / Math.log10(5000 / targetAcc)), accClass(a));
+        }
+      },
+      onDone: (pos, n, reason) => {
+        render(pos, n, reason);
+        setRing(1, accClass(pos.coords.accuracy));
+        setStatus('Located · ± ' + Math.round(pos.coords.accuracy) + ' m',
+          reason === 'target reached' ? 'Target accuracy reached.' :
+          reason === 'stopped' ? 'Stopped. Showing the best fix so far.' :
+          'Time limit reached. Showing the best fix received.');
+        $('start').lastChild.textContent = ' Locate again';
+        done();
+      },
+      onError: (err) => {
+        const msg = {
+          1: 'Permission denied — your browser is blocking location for this site.',
+          2: 'Position unavailable — location services may be off on this device.',
+          3: 'Timed out before any fix arrived. Try near a window or outdoors, or raise the time limit.',
+        };
+        setRing(0);
+        setStatus('Could not get a fix', ipData ? 'Showing your IP-based estimate instead.' : '');
+        showHelp(msg[err.code] || err.message, err.code === 1 ? 'permission' : 'other');
+        if (ipData) setFocus('ip');
+        done();
+      },
+    });
+  }
+
+  $('start').addEventListener('click', run);
+  $('stop').addEventListener('click', () => cancel && cancel());
+  $('copy').addEventListener('click', () => bestFix && copy(JSON.stringify(bestFix, null, 2), 'JSON'));
+  $('copyCoords').addEventListener('click', () => bestFix && copy(bestFix.latitude.toFixed(6) + ', ' + bestFix.longitude.toFixed(6), 'Coordinates'));
+
+  /* -------------------- IP geolocation (client side) ----------------- */
+  const IPV4 = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+  const IPV6 = /^(?=.*:)[0-9a-fA-F:]{2,45}$/;
+
+  function reservedReason(ip) {
+    if (!IPV4.test(ip)) {
+      const low = ip.toLowerCase();
+      if (low === '::1') return 'loopback';
+      if (low.startsWith('fe80')) return 'link-local';
+      if (/^f[cd]/.test(low)) return 'unique local (private)';
+      return null;
+    }
+    const [a, b] = ip.split('.').map(Number);
+    if (a === 0) return 'this network';
+    if (a === 10) return 'private (RFC 1918)';
+    if (a === 127) return 'loopback';
+    if (a === 172 && b >= 16 && b <= 31) return 'private (RFC 1918)';
+    if (a === 192 && b === 168) return 'private (RFC 1918)';
+    if (a === 169 && b === 254) return 'link-local';
+    if (a === 100 && b >= 64 && b <= 127) return 'carrier-grade NAT';
+    if (a >= 224) return 'multicast / reserved';
+    return null;
+  }
+
+  function flagOf(code) {
+    if (!code || !/^[A-Za-z]{2}$/.test(code)) return null;
+    return String.fromCodePoint(...code.toUpperCase().split('').map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+  }
+
+  async function fetchJson(url) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      const r = await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json' }, referrerPolicy: 'no-referrer' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.json();
+    } finally { clearTimeout(t); }
+  }
+
+  // Keyless HTTPS providers that allow browser (CORS) requests. Tried in order.
+  const PROVIDERS = [
+    {
+      name: 'ipwho.is',
+      url: (ip) => 'https://ipwho.is/' + (ip ? encodeURIComponent(ip) : ''),
+      parse: (d) => {
+        if (d.success === false) throw new Error(d.message || 'lookup failed');
+        return {
+          ip: d.ip, city: d.city, region: d.region, country: d.country, countryCode: d.country_code,
+          latitude: d.latitude, longitude: d.longitude, postalCode: d.postal,
+          timezone: d.timezone?.id, asn: d.connection?.asn ? String(d.connection.asn) : null,
+          isp: d.connection?.isp || d.connection?.org,
+        };
+      },
+    },
+    {
+      name: 'ipapi.co',
+      url: (ip) => 'https://ipapi.co/' + (ip ? encodeURIComponent(ip) + '/' : '') + 'json/',
+      parse: (d) => {
+        if (d.error) throw new Error(d.reason || 'lookup failed');
+        return {
+          ip: d.ip, city: d.city, region: d.region, country: d.country_name, countryCode: d.country_code,
+          latitude: d.latitude, longitude: d.longitude, postalCode: d.postal, timezone: d.timezone,
+          asn: d.asn ? String(d.asn).replace(/^AS/i, '') : null, isp: d.org,
+        };
+      },
+    },
+    {
+      name: 'GeoJS',
+      url: (ip) => 'https://get.geojs.io/v1/ip/geo' + (ip ? '/' + encodeURIComponent(ip) : '') + '.json',
+      parse: (d) => ({
+        ip: d.ip, city: d.city, region: d.region, country: d.country, countryCode: d.country_code,
+        latitude: parseFloat(d.latitude), longitude: parseFloat(d.longitude), postalCode: null,
+        timezone: d.timezone, asn: d.asn ? String(d.asn) : null, isp: d.organization_name || d.organization,
+      }),
+    },
+  ];
+
+  async function geolocateIp(ip) {
+    const failures = [];
+    for (const p of PROVIDERS) {
+      try {
+        const r = p.parse(await fetchJson(p.url(ip)));
+        if (!Number.isFinite(Number(r.latitude)) || !Number.isFinite(Number(r.longitude))) throw new Error('no coordinates');
+        const clean = Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v === '' || v === undefined ? null : v]));
+        clean.latitude = Number(clean.latitude);
+        clean.longitude = Number(clean.longitude);
+        return { ...clean, flag: flagOf(clean.countryCode), provider: p.name, failures };
+      } catch (e) {
+        failures.push({ provider: p.name, error: String(e.message || e) });
+      }
+    }
+    const err = new Error('Every IP provider failed (' + failures.map((f) => f.provider).join(', ') + '). An ad blocker may be blocking them.');
+    err.failures = failures;
+    throw err;
+  }
+
+  /* --------------------- my IP card + comparison --------------------- */
+  let ipData = null;
+
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371000, rad = Math.PI / 180;
+    const dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  function compareWithIp() {
+    if (!ipData || !bestFix) return;
+    const km = haversine(bestFix.latitude, bestFix.longitude, ipData.latitude, ipData.longitude) / 1000;
+    const el = $('ipdelta');
+    if (el) el.textContent = km.toFixed(1) + ' km from your precise fix';
+  }
+
+  geolocateIp('')
+    .then((d) => {
+      ipData = d;
+      $('ipBadge').className = 'pill good';
+      $('ipBadge').textContent = 'via ' + d.provider;
+      $('ip').innerHTML =
+        '<p class="place" style="margin:0 0 12px">' + (d.flag ? '<span class="flag">' + d.flag + '</span>' : '') +
+          esc([d.city, d.region, d.country].filter(Boolean).join(', ') || 'Unknown') + '</p>' +
+        '<dl class="kv">' +
+        '<dt>Coordinates</dt><dd>' + fmt(d.latitude, 4) + ', ' + fmt(d.longitude, 4) + '</dd>' +
+        '<dt>IP</dt><dd>' + esc(d.ip || '—') + '</dd>' +
+        '<dt>ISP</dt><dd>' + esc(d.isp || '—') + (d.asn ? ' · AS' + esc(d.asn) : '') + '</dd>' +
+        '<dt>Timezone</dt><dd>' + esc(d.timezone || '—') + '</dd>' +
+        '<dt>Difference</dt><dd id="ipdelta">—</dd>' +
+        '</dl>';
+      compareWithIp();
+      $('focusIp').disabled = false;
+      drawIp();
+      if (!bestFix) setFocus('ip');
+    })
+    .catch((e) => {
+      $('ipBadge').className = 'pill bad';
+      $('ipBadge').textContent = 'unavailable';
+      $('ip').innerHTML = '<p class="msg bad" style="margin:0">' + esc(e.message) + '</p>';
+    });
+
+  /* ------------------------------ tabs ------------------------------- */
+  let lkMap = null, lkLayer = null;
+
+  function selectTab(which, push = true) {
+    const me = which === 'me';
+    $('tabMe').setAttribute('aria-selected', String(me));
+    $('tabLookup').setAttribute('aria-selected', String(!me));
+    $('panel-me').classList.toggle('hidden', !me);
+    $('panel-lookup').classList.toggle('hidden', me);
+    if (push) history.replaceState(null, '', me ? location.pathname + location.search : '#lookup');
+    // Leaflet measures its container; re-measure after it becomes visible.
+    setTimeout(() => { if (me) map?.invalidateSize(); else lkMap?.invalidateSize(); }, 0);
+  }
+  $('tabMe').addEventListener('click', () => selectTab('me'));
+  $('tabLookup').addEventListener('click', () => selectTab('lookup'));
+
+  /* ---------------------------- IP lookup ---------------------------- */
+  let lookupData = null;
+
+  async function lookup(raw) {
+    const ip = raw.trim().replace(/^\[|\]$/g, '');
+    const status = $('lookupStatus');
+    status.className = 'msg';
+
+    if (ip && !IPV4.test(ip) && !IPV6.test(ip)) {
+      status.className = 'msg bad';
+      status.textContent = 'That is not a valid IPv4 or IPv6 address.';
+      return;
+    }
+    const reserved = ip && reservedReason(ip);
+    if (reserved) {
+      $('lookupResult').classList.add('hidden');
+      status.className = 'msg bad';
+      status.textContent = ip + ' is a ' + reserved + ' address. It is not on the public internet, so no database can place it.';
+      return;
+    }
+
+    status.textContent = 'Looking up ' + (ip || 'your address') + '…';
+    $('lookupBtn').disabled = true;
+    try {
+      const d = await geolocateIp(ip);
+      lookupData = d;
+      $('lookupResult').classList.remove('hidden');
+      status.textContent = ip ? '' : 'This is the address you are browsing from.';
+      $('lookupIp').value = d.ip || ip;
+      $('lkPlace').innerHTML = (d.flag ? '<span class="flag">' + d.flag + '</span>' : '') +
+        esc([d.city, d.region, d.country].filter(Boolean).join(', ') || 'Unknown location');
+      $('lkCoords').textContent = fmt(d.latitude, 4) + ', ' + fmt(d.longitude, 4);
+      $('lkIp').textContent = d.ip || ip || '—';
+      $('lkIsp').textContent = d.isp || '—';
+      $('lkAsn').textContent = d.asn ? 'AS' + d.asn : '—';
+      $('lkPostal').textContent = d.postalCode || '—';
+      $('lkTz').textContent = d.timezone || '—';
+      $('lkProvider').textContent = d.provider + (d.failures.length ? ' (after ' + d.failures.length + ' failed)' : '');
+      $('lkMaps').href = 'https://www.google.com/maps?q=' + d.latitude + ',' + d.longitude;
+
+      if (!lkMap) lkMap = makeMap($('lkMap'));
+      if (lkMap) {
+        lkMap.invalidateSize();
+        if (lkLayer) lkLayer.forEach((l) => l.remove());
+        const c = css('--ip'), ll = [d.latitude, d.longitude];
+        const circle = L.circle(ll, { radius: 25000, color: c, weight: 1.5, dashArray: '6 6', fillColor: c, fillOpacity: .1 }).addTo(lkMap);
+        lkLayer = [circle, L.circleMarker(ll, { radius: 7, color: '#fff', weight: 3, fillColor: c, fillOpacity: 1 }).addTo(lkMap)];
+        lkMap.fitBounds(circle.getBounds(), { maxZoom: 11, padding: [20, 20] });
+      }
+    } catch (e) {
+      status.className = 'msg bad';
+      status.textContent = e.message;
+    } finally {
+      $('lookupBtn').disabled = false;
+    }
+  }
+
+  $('lookupForm').addEventListener('submit', (e) => { e.preventDefault(); lookup($('lookupIp').value); });
+  $('lookupSelf').addEventListener('click', () => { $('lookupIp').value = ''; lookup(''); });
+  document.querySelectorAll('.examples [data-ip]').forEach((b) =>
+    b.addEventListener('click', () => { $('lookupIp').value = b.dataset.ip; lookup(b.dataset.ip); }));
+  $('lkCopy').addEventListener('click', () => lookupData && copy(JSON.stringify(lookupData, null, 2), 'JSON'));
+
+  /* ----------------------------- startup ----------------------------- */
+  if (location.hash === '#lookup') selectTab('lookup', false);
+
+  readPermission().then((s) => {
+    permState = s;
+    renderDiagnostics();
+    if (!secure) { showHelp('Geolocation is blocked on ' + location.protocol + ' — it needs HTTPS.', 'insecure'); return; }
+    // A previous visit already granted access: start without another prompt.
+    if (s === 'granted') run();
+    if (s === 'denied') showHelp('Location access is blocked for this site.', 'permission');
+  });
+})();
+</script>
+</body>
+</html>
