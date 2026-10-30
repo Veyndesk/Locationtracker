@@ -4,12 +4,108 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<meta name="description" content="Find your precise location with browser GPS, or look up the approximate location of any IP address. By Veyndesk.">
+<title>Where Am I? Find My Location &amp; GPS Coordinates | Veyndesk</title>
+<meta name="description" content="Find your exact location, latitude and longitude with your device's GPS on a live map. Look up any IP address location too. Free, no sign-up.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="author" content="Veyndesk">
+<meta name="application-name" content="Location Tracker">
+<link rel="canonical" href="https://veyndesk.github.io/Locationtracker/">
 <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0b0d12" media="(prefers-color-scheme: dark)">
-<title>Location Tracker · Veyndesk</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f6bff'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23fff'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%23fff' stroke-opacity='.5' stroke-width='2'/%3E%3C/svg%3E">
+
+<!-- Open Graph / social previews -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Veyndesk">
+<meta property="og:title" content="Where Am I? Find My Location &amp; GPS Coordinates">
+<meta property="og:description" content="Find your exact latitude and longitude with GPS on a live map, or look up the location of any IP address. Free, no sign-up.">
+<meta property="og:url" content="https://veyndesk.github.io/Locationtracker/">
+<meta property="og:image" content="https://veyndesk.github.io/Locationtracker/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Location Tracker by Veyndesk — find your GPS coordinates on a map">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Where Am I? Find My Location &amp; GPS Coordinates">
+<meta name="twitter:description" content="Find your exact latitude and longitude with GPS on a live map, or look up any IP address location.">
+<meta name="twitter:image" content="https://veyndesk.github.io/Locationtracker/og-image.png">
+
+<!-- Icons & app -->
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+
+<link rel="preconnect" href="https://a.tile.openstreetmap.org" crossorigin>
+<link rel="preconnect" href="https://ipwho.is" crossorigin>
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://veyndesk.github.io/#org",
+      "name": "Veyndesk",
+      "url": "https://veyndesk.github.io/",
+      "logo": "https://veyndesk.github.io/Locationtracker/icon-512.png",
+      "sameAs": ["https://github.com/veyndesk"]
+    },
+    {
+      "@type": "WebApplication",
+      "@id": "https://veyndesk.github.io/Locationtracker/#app",
+      "name": "Location Tracker",
+      "alternateName": ["Where Am I", "Find My Location"],
+      "url": "https://veyndesk.github.io/Locationtracker/",
+      "description": "Find your exact location and GPS coordinates on a live map using your device's GPS, or look up the approximate location of any IP address.",
+      "applicationCategory": "UtilitiesApplication",
+      "operatingSystem": "Any (web browser)",
+      "browserRequirements": "Requires a modern browser with JavaScript and the Geolocation API",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "image": "https://veyndesk.github.io/Locationtracker/og-image.png",
+      "featureList": [
+        "Precise GPS location with accuracy circle",
+        "Latitude and longitude coordinates",
+        "IP address location lookup (IPv4 and IPv6)",
+        "Live OpenStreetMap map",
+        "Light and dark mode"
+      ],
+      "publisher": { "@id": "https://veyndesk.github.io/#org" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I find my exact location?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Press “Get my location” and allow location access. The tool listens to your device's GPS for up to 20 seconds and keeps the most accurate reading, usually within 5–20 metres outdoors." }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I get my latitude and longitude?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Once your location is found, your latitude and longitude are shown in decimal degrees. Use “Copy coordinates” to copy them, or open them directly in Google Maps." }
+        },
+        {
+          "@type": "Question",
+          "name": "How accurate is IP address location?",
+          "acceptedAnswer": { "@type": "Answer", "text": "IP location shows where an internet provider registered a range of addresses, not where a device is. It is usually accurate to the city, with typical errors of 5–50 km, and can be much further off for mobile networks and VPNs." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is my location stored or shared?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. Everything runs in your browser. There is no server and nothing is saved. Your browser only contacts the map tile server and the IP lookup providers." }
+        },
+        {
+          "@type": "Question",
+          "name": "Why is my location wrong or not working?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Make sure location services are on for your device and browser, allow access for this site, and try near a window or outdoors. Desktop computers without GPS rely on Wi-Fi, which is less precise." }
+        }
+      ]
+    }
+  ]
+}
+</script>
 <style>
   :root {
     --bg: #f5f6f8;
@@ -115,9 +211,9 @@
   }
 
   /* ---------- layout ---------- */
-  main { padding: 32px 0 48px; }
+  main.wrap { padding-top: 32px; padding-bottom: 56px; }
   .hero { margin: 8px 0 22px; }
-  .hero h1 { font-size: clamp(24px, 4vw, 32px); margin: 0 0 6px; letter-spacing: -.025em; line-height: 1.15; }
+  .hero h1, .hero h2 { font-size: clamp(24px, 4vw, 32px); margin: 0 0 6px; letter-spacing: -.025em; line-height: 1.15; }
   .hero p { color: var(--muted); margin: 0; max-width: 620px; }
   .grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
   @media (min-width: 900px) {
@@ -272,11 +368,32 @@
   }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+
+  /* ---------- info / FAQ ---------- */
+  .info { margin-top: 40px; display: grid; gap: 16px; }
+  .info h2 { font-size: 22px; letter-spacing: -.02em; margin: 0 0 4px; }
+  .info .lead { color: var(--muted); margin: 0 0 8px; }
+  .steps { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .steps .card h3 { font-size: 15px; margin: 0 0 6px; display: flex; gap: 10px; align-items: center; }
+  .steps .card h3 b {
+    width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex: none;
+    background: var(--accent-soft); color: var(--accent); font-size: 13px;
+  }
+  .steps .card p { margin: 0; color: var(--muted); font-size: 14px; }
+  .faq details { border-top: 1px solid var(--border); padding: 14px 0; }
+  .faq details:first-of-type { border-top: 0; padding-top: 0; }
+  .faq summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; gap: 10px; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: "+"; margin-left: auto; color: var(--muted); font-size: 18px; line-height: 1.2; }
+  .faq details[open] summary::after { content: "–"; }
+  .faq details p { margin: 8px 0 0; color: var(--muted); }
+
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 </head>
 <body>
 
+<noscript><p style="padding:12px 16px;margin:0;background:#fff3cd;color:#5c4400">This location tool needs JavaScript to read your GPS and show the map.</p></noscript>
 <header class="top">
   <div class="wrap">
     <div class="brand">
@@ -304,8 +421,8 @@
 <section id="panel-me" role="tabpanel" aria-labelledby="tabMe">
 
   <div class="hero">
-    <h1>Where am I, exactly?</h1>
-    <p>Uses your device's GPS for a precise fix (needs your permission), with an IP-based estimate as a fallback. Nothing is stored or sent anywhere except the map tiles.</p>
+    <h1>Where am I? Find my exact location</h1>
+    <p>Get your precise latitude and longitude from your device's GPS and see it on a live map. An IP-based estimate is shown as a fallback. Free, no sign-up, and nothing is stored.</p>
   </div>
 
   <div class="grid two">
@@ -410,7 +527,7 @@
 <section id="panel-lookup" role="tabpanel" aria-labelledby="tabLookup" class="hidden">
 
   <div class="hero">
-    <h1>Look up any IP address</h1>
+    <h2>Look up any IP address location</h2>
     <p>See the city, network and ISP that an IP address is registered to. This is a database estimate, not a device's position.</p>
   </div>
 
@@ -471,11 +588,32 @@
   </div>
 </section>
 
+<section class="info" aria-labelledby="howTitle">
+  <div>
+    <h2 id="howTitle">How to find your location</h2>
+    <p class="lead">Three steps, no app or account needed. Works on Android, iPhone, Windows and Mac.</p>
+  </div>
+  <div class="steps">
+    <div class="card"><h3><b>1</b>Press “Get my location”</h3><p>Your browser asks for permission once. Allow it so the page can read your device's GPS.</p></div>
+    <div class="card"><h3><b>2</b>Wait a few seconds</h3><p>The first reading is often rough. The tool keeps listening and keeps the most accurate fix, usually within 5–20&nbsp;m outdoors.</p></div>
+    <div class="card"><h3><b>3</b>Copy or share</h3><p>Copy your latitude and longitude, copy the full reading as JSON, or open the spot in Google Maps.</p></div>
+  </div>
+
+  <div class="card faq">
+    <h2 style="font-size:18px;margin:0 0 14px">Frequently asked questions</h2>
+    <details><summary>How do I find my exact location?</summary><p>Press “Get my location” and allow location access. The tool listens to your device's GPS for up to 20 seconds and keeps the most accurate reading, usually within 5–20 metres outdoors.</p></details>
+    <details><summary>How do I get my latitude and longitude?</summary><p>Once your location is found, your latitude and longitude are shown in decimal degrees. Use “Copy coordinates” to copy them, or open them directly in Google Maps.</p></details>
+    <details><summary>How accurate is IP address location?</summary><p>IP location shows where an internet provider registered a range of addresses, not where a device is. It is usually accurate to the city, with typical errors of 5–50&nbsp;km, and can be much further off for mobile networks and VPNs.</p></details>
+    <details><summary>Is my location stored or shared?</summary><p>No. Everything runs in your browser. There is no server and nothing is saved. Your browser only contacts the map tile server and the IP lookup providers.</p></details>
+    <details><summary>Why is my location wrong or not working?</summary><p>Make sure location services are on for your device and browser, allow access for this site, and try near a window or outdoors. Desktop computers without GPS rely on Wi-Fi, which is less precise.</p></details>
+  </div>
+</section>
+
 </main>
 
 <footer>
   <div class="wrap">
-    <span>© <span id="year"></span> Veyndesk</span>
+    <span>© <span id="year"></span> <a href="https://veyndesk.github.io/">Veyndesk</a></span>
     <a href="https://github.com/veyndesk/Locationtracker" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
     <span>Map data © OpenStreetMap contributors</span>
     <span>IP data: ipwho.is · ipapi.co · GeoJS · Flags: flagcdn.com</span>
