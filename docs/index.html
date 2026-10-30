@@ -260,7 +260,7 @@
   .examples button { padding: 4px 10px; font-size: 12.5px; font-family: var(--mono); font-weight: 500; border-radius: 99px; }
 
   .place { font-size: 18px; font-weight: 650; margin: 2px 0 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .flag { font-size: 22px; }
+  .flag { width: 28px; height: 21px; border-radius: 4px; object-fit: cover; box-shadow: 0 0 0 1px var(--border); flex: none; }
 
   footer { color: var(--muted); font-size: 13px; padding: 28px 0 40px; border-top: 1px solid var(--border); }
   footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
@@ -478,7 +478,7 @@
     <span>© <span id="year"></span> Veyndesk</span>
     <a href="https://github.com/veyndesk/Locationtracker" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
     <span>Map data © OpenStreetMap contributors</span>
-    <span>IP data: ipwho.is · ipapi.co · GeoJS</span>
+    <span>IP data: ipwho.is · ipapi.co · GeoJS · Flags: flagcdn.com</span>
   </div>
 </footer>
 
@@ -871,6 +871,11 @@
     return String.fromCodePoint(...code.toUpperCase().split('').map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
   }
 
+  // Windows has no flag emoji, so use small flag images (falls back to nothing).
+  const flagImg = (code) => code && /^[A-Za-z]{2}$/.test(code)
+    ? '<img class="flag" alt="" width="28" height="21" src="https://flagcdn.com/w40/' + code.toLowerCase() + '.png" onerror="this.remove()">'
+    : '';
+
   async function fetchJson(url) {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 8000);
@@ -961,7 +966,7 @@
       $('ipBadge').className = 'pill good';
       $('ipBadge').textContent = 'via ' + d.provider;
       $('ip').innerHTML =
-        '<p class="place" style="margin:0 0 12px">' + (d.flag ? '<span class="flag">' + d.flag + '</span>' : '') +
+        '<p class="place" style="margin:0 0 12px">' + flagImg(d.countryCode) +
           esc([d.city, d.region, d.country].filter(Boolean).join(', ') || 'Unknown') + '</p>' +
         '<dl class="kv">' +
         '<dt>Coordinates</dt><dd>' + fmt(d.latitude, 4) + ', ' + fmt(d.longitude, 4) + '</dd>' +
@@ -1026,7 +1031,7 @@
       $('lookupResult').classList.remove('hidden');
       status.textContent = ip ? '' : 'This is the address you are browsing from.';
       $('lookupIp').value = d.ip || ip;
-      $('lkPlace').innerHTML = (d.flag ? '<span class="flag">' + d.flag + '</span>' : '') +
+      $('lkPlace').innerHTML = flagImg(d.countryCode) +
         esc([d.city, d.region, d.country].filter(Boolean).join(', ') || 'Unknown location');
       $('lkCoords').textContent = fmt(d.latitude, 4) + ', ' + fmt(d.longitude, 4);
       $('lkIp').textContent = d.ip || ip || '—';
