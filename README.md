@@ -1,9 +1,16 @@
-# Location Tracker
+# Location Tracker — Where Am I? Find My Location & GPS Coordinates
 
-**Live:** https://veyndesk.github.io/Locationtracker/
+[![Live site](https://img.shields.io/badge/live-veyndesk.github.io%2FLocationtracker-2f6bff)](https://veyndesk.github.io/Locationtracker/)
+![No build](https://img.shields.io/badge/build-none-646b78)
 
-A zero-build, zero-dependency location tool by **Veyndesk**, hosted on GitHub Pages.
-Everything runs in the browser — there is no server.
+**👉 Try it: https://veyndesk.github.io/Locationtracker/**
+
+A free online tool by **[Veyndesk](https://github.com/veyndesk)** to **find your current location**,
+get your exact **latitude and longitude (GPS coordinates)** on a live map, and **look up the location
+of any IP address** (IPv4 and IPv6). No app, no sign-up, nothing stored — everything runs in your
+browser.
+
+[![Location Tracker by Veyndesk](docs/og-image.png)](https://veyndesk.github.io/Locationtracker/)
 
 | | Method | Permission | Typical accuracy |
 |---|---|---|---|
