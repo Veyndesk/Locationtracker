@@ -1,127 +1,78 @@
 # Location Tracker
 
-Zero-dependency location tool, deploys to Vercel with no build step.
-Two independent methods, same as the pattern oticon.global uses:
+**Live:** https://veyndesk.github.io/Locationtracker/
+
+A zero-build, zero-dependency location tool by **Veyndesk**, hosted on GitHub Pages.
+Everything runs in the browser — there is no server.
 
 | | Method | Permission | Typical accuracy |
 |---|---|---|---|
-| **Precise** | `navigator.geolocation.watchPosition` (GPS/GNSS + WiFi) | Required | ± 5–20 m outdoors, ± 20–100 m indoors |
-| **Approximate** | Vercel `x-vercel-ip-*` edge headers (IP database) | None | ± 1–50 km, city level |
+| **Precise** | `navigator.geolocation.watchPosition` (GPS/GNSS + Wi-Fi) | Required | ± 5–20 m outdoors, ± 20–100 m indoors |
+| **Approximate** | Public IP geolocation databases | None | ± 5–50 km, city level |
+
+## Features
+
+- **My location** — watches the device position, keeps the most accurate fix, and stops at a
+  target accuracy (default ± 15 m) or a time limit (default 20 s).
+- **Live map** (Leaflet + OpenStreetMap) with an accuracy circle around the precise fix and a
+  dashed city-level circle for the IP estimate.
+- **Accuracy meter** and a **convergence chart** that shows the fix tightening over time.
+- **IP lookup** for any IPv4/IPv6 address, with private and reserved ranges rejected up front.
+- Light and dark themes, mobile-first layout, copy as JSON / coordinates, open in Google Maps.
 
 ## Why `watchPosition` and not `getCurrentPosition`
 
-The first fix a device returns is almost always the coarse one — cached, or
-derived from nearby WiFi BSSIDs (± 500–2000 m). The GPS chip needs a few
-seconds of sky time before it reports a real lock. A single
-`getCurrentPosition()` call usually hands you that first coarse fix and stops.
+The first fix a device returns is almost always the coarse one — cached, or derived from nearby
+Wi-Fi (± 500–2000 m). The GPS chip needs a few seconds before it reports a real lock, so a single
+`getCurrentPosition()` usually returns that coarse fix and stops. This tool keeps watching and
+keeps the reading with the lowest `coords.accuracy`.
 
-So this tool watches instead, keeps the reading with the lowest
-`coords.accuracy`, and stops early once it hits the target (default ± 15 m) or
-the time limit (default 20 s), whichever comes first. The convergence panel
-shows every fix as it arrives so you can see it tighten.
+- `enableHighAccuracy: true` asks for GPS rather than the cheap network fix.
+- `maximumAge: 0` refuses a cached position.
+- Error `code === 1` (permission denied) is terminal; codes 2 and 3 are not.
 
-Other settings that matter:
+## IP geolocation
 
-- `enableHighAccuracy: true` — asks for GPS rather than the cheap network fix.
-- `maximumAge: 0` — refuses a cached position outright.
-- Errors with `code === 1` (permission denied) are terminal; codes 2 and 3 are
-  not, since a device can fail a fix and then succeed seconds later.
+Requests go straight from the browser to keyless, CORS-enabled HTTPS providers, tried in order:
+`ipwho.is` → `ipapi.co` → `get.geojs.io`. Whichever answers first is normalised into one shape.
 
-## IP lookup tab
+An IP maps to the location an ISP **registered for a whole range**, not to a device:
 
-`api/ip.js` resolves any address you type. This is a **different mechanism**
-from `api/geo.js` — Vercel's `x-vercel-ip-*` headers only describe the client
-making the request and cannot be aimed at a third party, so looking up someone
-else's address means querying a geolocation database.
+- Mobile carriers hand out addresses from a gateway pool; the pin can be hundreds of km away.
+- VPNs, proxies and CDNs return the exit node.
+- No IP lookup returns a street address.
 
-Two keyless HTTPS providers are tried in order, `ipwho.is` then `ipapi.co`, and
-whichever answers first is normalised into one shape. The address is validated
-as IPv4/IPv6 before it is ever interpolated into a provider URL, and private,
-loopback, link-local, CGNAT and multicast ranges are rejected up front with an
-explanation rather than passed on.
+The IP maps never zoom past city level for that reason.
 
-### Accuracy ceiling
-
-An IP maps to the location an ISP **registered for a whole range**, not to a
-device. Typical error is 5–50 km. It gets worse:
-
-- **Mobile carriers** hand out addresses from a gateway pool; the pin can be
-  hundreds of kilometres from the handset.
-- **VPNs, proxies and CDNs** return the exit node. Looking up `1.1.1.1` returns
-  Brisbane, because that is where APNIC registered it — while the anycast
-  address itself is answered from hundreds of sites worldwide.
-- **No IP lookup returns a street address.** Anything claiming otherwise is
-  selling you a database with the same city-level data and a confident UI.
-
-The map on this tab is pinned to `z=11` on purpose. Zooming to street level
-would imply a precision the data does not have.
-
-## Map
-
-The map is a Google Maps iframe on the keyless `output=embed` endpoint:
+## Project layout
 
 ```
-https://www.google.com/maps?q=LAT,LNG&z=18&hl=en&output=embed
+docs/
+  index.html            the whole app — UI, styles and logic in one file
+  vendor/leaflet/       Leaflet 1.9.4 (BSD-2-Clause), self-hosted
 ```
-
-No API key, no billing account. Zoom is derived from `coords.accuracy`, so a
-± 10 m GPS fix lands on z=18 while a city-level IP guess sits at z=11. Toggle
-buttons switch the pin between the precise fix and the IP location.
-
-The trade-off is that this endpoint is undocumented — Google has never
-promised to keep it. The supported route is the
-[Maps Embed API](https://developers.google.com/maps/documentation/embed):
-
-```html
-<iframe src="https://www.google.com/maps/embed/v1/place?key=YOUR_KEY&q=LAT,LNG&zoom=18"></iframe>
-```
-
-Either way, loading the map sends the coordinates to Google. If you want an
-accuracy circle drawn around the pin, or no third-party call at all, swap the
-iframe for Leaflet with OpenStreetMap tiles.
-
-## Requirements
-
-Geolocation only works in a **secure context** — HTTPS, or `localhost`.
-Vercel gives you HTTPS automatically.
 
 ## Run locally
 
-```bash
-node dev-server.js
-```
-
-Then open http://localhost:3000. The IP card reports "unavailable" locally,
-because `x-vercel-ip-*` headers are injected by Vercel's edge, not by your
-machine. Everything else works.
-
-To exercise the IP path locally, fake the headers:
+Geolocation needs a secure context; `localhost` counts.
 
 ```bash
-curl -s http://localhost:3000/api/geo -H "x-vercel-ip-city: Dehiwala" -H "x-vercel-ip-country: LK" -H "x-vercel-ip-latitude: 6.8505" -H "x-vercel-ip-longitude: 79.8603"
+cd docs
+python3 -m http.server 8000
+# open http://localhost:8000
 ```
 
 ## Deploy
 
-```bash
-npx vercel --prod
-```
+GitHub Pages serves the `docs/` folder of the `main` branch
+(Settings → Pages → Deploy from a branch → `main` / `/docs`). Every push to `main` redeploys.
 
-No framework, no `npm install` — Vercel picks up `public/` as static files and
-`api/geo.js` as a serverless function by convention.
+## Privacy
 
-## Files
+Nothing is stored or sent to a Veyndesk server — there isn't one. The browser talks directly to
+the map tile server (OpenStreetMap) and the IP providers listed above. If you extend this to save
+locations, do it on an explicit user action and tell people what you keep.
 
-- `public/index.html` — the whole UI and tracking logic, single file
-- `api/geo.js` — reads Vercel's IP-geolocation headers, returns JSON
-- `dev-server.js` — local static server + `/api/geo` route, no CLI needed
-- `vercel.json` — `no-store` on the API, `geolocation=(self)` permissions policy
+---
 
-## Extending
-
-`bestFix` in `public/index.html` is the finished JSON object. To persist fixes,
-POST it to a new `api/report.js` and write to your store of choice — but do
-that on an explicit user action, and tell people what you keep. Silent
-background collection of precise location is a legal problem in most
-jurisdictions (GDPR treats it as personal data; iOS Safari and Android Chrome
-both surface a persistent indicator anyway).
+© Veyndesk
